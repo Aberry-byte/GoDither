@@ -10,11 +10,12 @@ import (
 
 func findClosestPaletteColorGrey(gray uint8, mean int) color.Gray {
 	var newGray uint8
-	if gray > 150 {
+	/* if gray > 150 {
 		newGray = 255
 	} else {
 		newGray = 0
-	}
+	} */
+	newGray = (gray / 255)
 	Gray := new(color.Gray)
 	Gray.Y = newGray
 	// leave alpha channel as is
@@ -54,19 +55,25 @@ func main() {
 	}
 	meanPixelVal := sumOfPixels / len(pixelVals)
 
-	for y := decodedImage.Bounds().Min.Y; y < decodedImage.Bounds().Max.Y; y++ {
-		for x := decodedImage.Bounds().Min.X; x < decodedImage.Bounds().Max.X; x++ {
-			oldPixel := color.GrayModel.Convert(decodedImage.At(x, y)).(color.Gray)
+	// important to use the grayscale image here instead of color
+	for y := greyImg.Bounds().Min.Y; y < greyImg.Bounds().Max.Y; y++ {
+		for x := greyImg.Bounds().Min.X; x < greyImg.Bounds().Max.X; x++ {
+			oldPixel := greyImg.At(x, y).(color.Gray)
 			var newPixel color.Gray = findClosestPaletteColorGrey(oldPixel.Y, meanPixelVal)
 			quantError := oldPixel.Y - newPixel.Y
-			ditherFactorRight := new(color.Gray)
-			ditherFactorRight.Y = (quantError * (7 / 16))
-			ditherFactorUpLeft := new(color.Gray)
-			ditherFactorUpLeft.Y = (quantError * (3 / 16))
-			ditherFactorUp := new(color.Gray)
-			ditherFactorUp.Y = (quantError * (5 / 16))
-			ditherFactorUpRight := new(color.Gray)
-			ditherFactorUpRight.Y = (quantError * (1 / 16))
+			// fmt.Printf("%v,", quantError)
+
+			ditherFactorRight := greyImg.At(x+1, y).(color.Gray)
+			ditherFactorRight.Y += (uint8)((float32)(quantError) * (7.0 / 16.0))
+
+			ditherFactorUpLeft := greyImg.At(x-1, y+1).(color.Gray)
+			ditherFactorUpLeft.Y += (uint8)((float32)(quantError) * (3.0 / 16.0))
+
+			ditherFactorUp := greyImg.At(x, y+1).(color.Gray)
+			ditherFactorUp.Y += (uint8)((float32)(quantError) * (5.0 / 16.0))
+
+			ditherFactorUpRight := greyImg.At(x+1, y+1).(color.Gray)
+			ditherFactorUpRight.Y += (uint8)((float32)(quantError) * (1.0 / 16.0))
 			// * Set up new pixels
 			ditheredImg.Set(x+1, y, ditherFactorRight)
 			ditheredImg.Set(x-1, y+1, ditherFactorUpLeft)
