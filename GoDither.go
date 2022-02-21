@@ -1,15 +1,20 @@
 package main
 
 import (
-	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"log"
 	"os"
 )
 
-func findClosestPaletteColorGrey(gray uint8) color.Gray {
-	newGray := gray / 255
+func findClosestPaletteColorGrey(gray uint8, mean int) color.Gray {
+	var newGray uint8
+	if gray > 150 {
+		newGray = 255
+	} else {
+		newGray = 0
+	}
 	Gray := new(color.Gray)
 	Gray.Y = newGray
 	// leave alpha channel as is
@@ -18,37 +23,66 @@ func findClosestPaletteColorGrey(gray uint8) color.Gray {
 
 func main() {
 
-	image, err := os.Open(os.Args[1])
+	imageFile, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer image.Close()
+	defer imageFile.Close()
 
 	// Maybe change this to image.Decode for more formats
-	pngImage, err := png.Decode(image)
+	decodedImage, err := png.Decode(imageFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Bruh how do I do this GoLang
-	ditheredImg := image.newGray(image.Rectangle{})
+	greyImg := image.NewGray(decodedImage.Bounds())
+	ditheredImg := image.NewGray(decodedImage.Bounds())
 
-	// fmt.Println(pngImage)
-
-	// levels := []string{" ", "░", "▒", "▓", "█"}
-
-	for y := pngImage.Bounds().Min.Y; y < pngImage.Bounds().Max.Y; y++ {
-		for x := pngImage.Bounds().Min.X; x < pngImage.Bounds().Max.X; x++ {
-			oldPixel := color.GrayModel.Convert(pngImage.At(x, y)).(color.Gray)
-			var newPixel color.Gray = findClosestPaletteColorGrey(oldPixel.Y)
-			/*
-				level := c.Y / 51 // 51 * 5 = 255
-				if level == 5 {
-					level--
-				}
-				fmt.Print(levels[level])
-			*/
+	// * first we have to find median for a more accurate closet pixel
+	var pixelVals []uint8
+	for y := decodedImage.Bounds().Min.Y; y < decodedImage.Bounds().Max.Y; y++ {
+		for x := decodedImage.Bounds().Min.X; x < decodedImage.Bounds().Max.X; x++ {
+			oldPixel := color.GrayModel.Convert(decodedImage.At(x, y)).(color.Gray)
+			greyImg.Set(x, y, oldPixel)
+			pixelVals = append(pixelVals, oldPixel.Y)
 		}
-		fmt.Print("\n")
+	}
+
+	var sumOfPixels int = 0
+	for pixelVal := range pixelVals {
+		sumOfPixels += pixelVal
+	}
+	meanPixelVal := sumOfPixels / len(pixelVals)
+
+	for y := decodedImage.Bounds().Min.Y; y < decodedImage.Bounds().Max.Y; y++ {
+		for x := decodedImage.Bounds().Min.X; x < decodedImage.Bounds().Max.X; x++ {
+			oldPixel := color.GrayModel.Convert(decodedImage.At(x, y)).(color.Gray)
+			var newPixel color.Gray = findClosestPaletteColorGrey(oldPixel.Y, meanPixelVal)
+			quantError := oldPixel.Y - newPixel.Y
+			ditherFactorRight := new(color.Gray)
+			ditherFactorRight.Y = (quantError * (7 / 16))
+			ditherFactorUpLeft := new(color.Gray)
+			ditherFactorUpLeft.Y = (quantError * (3 / 16))
+			ditherFactorUp := new(color.Gray)
+			ditherFactorUp.Y = (quantError * (5 / 16))
+			ditherFactorUpRight := new(color.Gray)
+			ditherFactorUpRight.Y = (quantError * (1 / 16))
+			// * Set up new pixels
+			ditheredImg.Set(x+1, y, ditherFactorRight)
+			ditheredImg.Set(x-1, y+1, ditherFactorUpLeft)
+			ditheredImg.Set(x, y+1, ditherFactorUp)
+			ditheredImg.Set(x+1, y+1, ditherFactorUpRight)
+		}
+	}
+
+	// Save new image
+	newImgFile, err := os.Create("Dithered.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer newImgFile.Close()
+
+	if err := png.Encode(newImgFile, ditheredImg); err != nil {
+		log.Fatal(err)
 	}
 }
