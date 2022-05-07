@@ -10,12 +10,11 @@ import (
 
 func findClosestPaletteColorGrey(gray uint8, mean int) color.Gray {
 	var newGray uint8
-	/* if gray > 150 {
-		newGray = 255
+	if gray != 0 {
+		newGray = gray / (uint8(mean)) * 255
 	} else {
-		newGray = 0
-	} */
-	newGray = (gray / 255)
+		newGray = gray
+	}
 	Gray := new(color.Gray)
 	Gray.Y = newGray
 	// leave alpha channel as is
@@ -50,8 +49,8 @@ func main() {
 	}
 
 	var sumOfPixels int = 0
-	for pixelVal := range pixelVals {
-		sumOfPixels += pixelVal
+	for _, pixelVal := range pixelVals {
+		sumOfPixels += (int)(pixelVal)
 	}
 	meanPixelVal := sumOfPixels / len(pixelVals)
 
@@ -66,30 +65,43 @@ func main() {
 			ditherFactorRight := greyImg.At(x+1, y).(color.Gray)
 			ditherFactorRight.Y += (uint8)((float32)(quantError) * (7.0 / 16.0))
 
-			ditherFactorUpLeft := greyImg.At(x-1, y+1).(color.Gray)
-			ditherFactorUpLeft.Y += (uint8)((float32)(quantError) * (3.0 / 16.0))
+			ditherFactorBtmLeft := greyImg.At(x-1, y+1).(color.Gray)
+			ditherFactorBtmLeft.Y += (uint8)((float32)(quantError) * (3.0 / 16.0))
 
-			ditherFactorUp := greyImg.At(x, y+1).(color.Gray)
-			ditherFactorUp.Y += (uint8)((float32)(quantError) * (5.0 / 16.0))
+			ditherFactorDown := greyImg.At(x, y+1).(color.Gray)
+			ditherFactorDown.Y += (uint8)((float32)(quantError) * (5.0 / 16.0))
 
-			ditherFactorUpRight := greyImg.At(x+1, y+1).(color.Gray)
-			ditherFactorUpRight.Y += (uint8)((float32)(quantError) * (1.0 / 16.0))
+			ditherFactorBtmRight := greyImg.At(x+1, y+1).(color.Gray)
+			ditherFactorBtmRight.Y += (uint8)((float32)(quantError) * (1.0 / 16.0))
 			// * Set up new pixels
+			ditheredImg.Set(x, y, newPixel)
 			ditheredImg.Set(x+1, y, ditherFactorRight)
-			ditheredImg.Set(x-1, y+1, ditherFactorUpLeft)
-			ditheredImg.Set(x, y+1, ditherFactorUp)
-			ditheredImg.Set(x+1, y+1, ditherFactorUpRight)
+			ditheredImg.Set(x-1, y+1, ditherFactorBtmLeft)
+			ditheredImg.Set(x, y+1, ditherFactorDown)
+			ditheredImg.Set(x+1, y+1, ditherFactorBtmRight)
 		}
 	}
-
-	// Save new image
+	// create dithered.png
 	newImgFile, err := os.Create("Dithered.png")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer newImgFile.Close()
 
+	// write out dithered image
 	if err := png.Encode(newImgFile, ditheredImg); err != nil {
+		log.Fatal(err)
+	}
+
+	// create black and white image
+	newGrayFile, err := os.Create("Grey.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer newGrayFile.Close()
+
+	// Write out black and white image
+	if err := png.Encode(newGrayFile, greyImg); err != nil {
 		log.Fatal(err)
 	}
 }
