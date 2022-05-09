@@ -1,5 +1,5 @@
 package main
-
+// This is a test comment to see if git config was right
 import (
 	"image"
 	"image/color"
